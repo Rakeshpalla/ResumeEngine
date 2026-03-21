@@ -75,7 +75,13 @@ MAX_UPLOAD_SIZE_MB = 5
 ALLOWED_EXTENSIONS = {".pdf", ".docx"}
 
 # --- CORS ---
+# Comma-separated extra origins (e.g. your Vercel preview/production URLs)
+_cors_extra = os.getenv("CORS_ORIGINS", "").strip()
 CORS_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+if _cors_extra:
+    CORS_ORIGINS.extend(
+        [o.strip() for o in _cors_extra.split(",") if o.strip() and o.strip() not in CORS_ORIGINS]
+    )

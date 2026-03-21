@@ -14,3 +14,8 @@ AI-assisted job search and tailored resume generation.
 3. Frontend: from `jobcraft/frontend`, `npm install` and `npm run dev` (proxies `/api` to port 8080).  
 
 See `jobcraft/.gitignore` for paths excluded from version control (data, `.env`, venv).
+
+## Production (Vercel + API)
+
+- **Frontend:** deploy `jobcraft/frontend` to [Vercel](https://vercel.com); set `VITE_API_BASE_URL` to your hosted API (e.g. `https://your-api.example.com/api`).  
+- **Backend:** host FastAPI separately (Railway, Render, Fly, VPS)—see **[DEPLOY.md](./DEPLOY.md)** for steps and CORS.
