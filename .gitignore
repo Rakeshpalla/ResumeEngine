@@ -1,0 +1,42 @@
+# Secrets — never commit
+.env
+**/.env
+!**/.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+*.local
+
+# App data & uploads (local only)
+**/data/resumes/
+**/data/jobs/
+*.db
+**/jobcraft/data/
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Scratch / local
+tmp_test/
+
+# Cursor / editor workspace storage (if present)
+.cursor/
