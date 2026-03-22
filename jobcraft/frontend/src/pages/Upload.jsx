@@ -4,6 +4,7 @@ import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUploadResume, useStartSearch, useSettings } from '../hooks/useJobs';
 import Navbar from '../components/Navbar';
+import { describeApiError } from '../utils/apiError';
 
 function TagInput({ label, tags, onChange, placeholder }) {
   const [input, setInput] = useState('');
@@ -80,7 +81,7 @@ export default function Upload() {
         await uploadResume.mutateAsync(f);
         setUploaded(true);
       } catch (err) {
-        setError(err.response?.data?.detail || 'Upload failed.');
+        setError(describeApiError(err, 'Upload failed.'));
       }
     }
   }, [uploadResume]);
@@ -140,6 +141,18 @@ export default function Upload() {
           <p className="mb-10 text-text-secondary">
             Upload your resume, set preferences, and let JobCraft find your perfect role.
           </p>
+
+          {import.meta.env.PROD && !import.meta.env.VITE_API_BASE_URL && (
+            <div className="mb-8 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-text-primary">
+              <strong className="text-warning">Backend required:</strong> This page is hosted on Vercel, but the
+              API runs separately. In Vercel → Environment Variables, set{' '}
+              <code className="rounded bg-bg-surface px-1 py-0.5 text-xs">VITE_API_BASE_URL</code> to your FastAPI
+              URL ending in <code className="rounded bg-bg-surface px-1 py-0.5 text-xs">/api</code> (e.g.{' '}
+              <code className="text-xs">https://your-app.up.railway.app/api</code>), redeploy, and enable{' '}
+              <code className="rounded bg-bg-surface px-1 py-0.5 text-xs">PUBLIC_DEMO_MODE</code> +{' '}
+              <code className="rounded bg-bg-surface px-1 py-0.5 text-xs">CORS_ORIGINS</code> on the server.
+            </div>
+          )}
 
           {/* Step 1 — Resume Upload */}
           <div className="mb-10">

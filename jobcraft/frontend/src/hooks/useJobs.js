@@ -76,9 +76,8 @@ export function useUploadResume() {
     mutationFn: async (file) => {
       const formData = new FormData();
       formData.append('file', file);
-      const { data } = await api.post('/resume/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      // Let axios set multipart boundary — manual Content-Type breaks uploads
+      const { data } = await api.post('/resume/upload', formData);
       return data;
     },
   });
