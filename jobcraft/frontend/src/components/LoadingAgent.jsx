@@ -21,8 +21,12 @@ export default function LoadingAgent() {
       <h2 className="mb-2 font-[family-name:var(--font-display)] text-2xl font-bold text-text-primary">
         Agent is working...
       </h2>
-      <p className="mb-8 text-sm text-text-secondary">
+      <p className="mb-2 text-sm text-text-secondary">
         Sit tight — we're searching, tailoring, and scoring your opportunities.
+      </p>
+      <p className="mb-8 max-w-md text-center text-xs text-text-secondary/80">
+        Each job runs a full AI rewrite plus scoring. With local models (Ollama), expect about 1–4 minutes per job;
+        the progress bar updates after each major step.
       </p>
 
       {/* Progress Bar */}

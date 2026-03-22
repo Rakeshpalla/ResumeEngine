@@ -50,6 +50,10 @@ OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "120"))
 DEFAULT_USERNAME = os.getenv("DEFAULT_USERNAME", "admin")
 DEFAULT_PASSWORD = os.getenv("DEFAULT_PASSWORD", "jobcraft2024")
 
+# When True, API accepts requests without JWT and uses the default user (demo / public UI only).
+# NEVER enable on a server with sensitive data or a shared production API.
+PUBLIC_DEMO_MODE = os.getenv("PUBLIC_DEMO_MODE", "").strip().lower() in ("1", "true", "yes")
+
 # --- Scraper Limits ---
 MAX_JOBS_PER_PORTAL = 10
 SCRAPE_COOLDOWN_SECONDS = 60  # 1 minute between scraping runs (dev-friendly)

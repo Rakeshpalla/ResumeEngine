@@ -536,7 +536,10 @@ async def _process_selected_jobs(
                 except Exception:
                     logger.exception("JD refresh failed for job_id=%s", job.id)
 
-                await update_status(f"🤖 Tailoring resume for {job.company} — {job.title}...")
+                await update_status(
+                    f"🤖 Tailoring resume for {job.company} — {job.title}... "
+                    f"(step {i + 1}/{total}; AI rewrite can take 1–4 min locally)"
+                )
                 tailor_call = functools.partial(
                     tailor_resume,
                     resume_text=resume_text,
@@ -546,6 +549,8 @@ async def _process_selected_jobs(
                     api_key=api_key,
                 )
                 tailored = await loop.run_in_executor(ai_executor, tailor_call)
+                _agent_status["progress"] = min(95, base_pct + 22)
+                await update_status(f"✓ Tailored {job.company} — scoring & PDF...")
             except Exception as e:
                 logger.exception("Tailoring failed: run_id=%s job_id=%s error=%s", run_id, job.id, e)
                 _agent_status["progress"] = min(95, base_pct + 25)

@@ -127,14 +127,62 @@ def _validate_tailored_response(data: Dict) -> tuple[bool, list[str]]:
     return (len(issues) == 0), issues
 
 
+def _normalize_bullet_key(text: str) -> str:
+    """Normalize bullet text for duplicate detection."""
+    t = re.sub(r"\s+", " ", (text or "").strip().lower())
+    # Strip trailing punctuation variance
+    t = re.sub(r"[.;:]+$", "", t)
+    return t
+
+
+def _dedupe_bullet_list(bullets: list) -> list[str]:
+    """Remove duplicate bullets (case-insensitive / whitespace-normalized), preserve order."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for b in bullets:
+        t = str(b).strip()
+        if not t:
+            continue
+        k = _normalize_bullet_key(t)
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(t)
+    return out
+
+
+def _dedupe_all_experience_bullets(data: Dict) -> Dict:
+    """Remove duplicate bullets within each experience entry (AI or padding errors)."""
+    if not isinstance(data, dict):
+        return data
+    exp = data.get("experience")
+    if not isinstance(exp, list):
+        return data
+    for item in exp:
+        if isinstance(item, dict) and isinstance(item.get("bullets"), list):
+            item["bullets"] = _dedupe_bullet_list(item["bullets"])
+    return data
+
+
+# When padding is required, use distinct lines — never repeat the last bullet (user-visible bug).
+_BULLET_PAD_STOCK: list[str] = [
+    "Partnered with 3+ cross-functional teams to translate customer insights into prioritized roadmap items with measurable business impact.",
+    "Drove execution cadence across 2-week release cycles, improving delivery predictability by 15% through clearer milestones and risk tracking.",
+    "Collaborated with engineering and design leadership on discovery, prioritization, and tradeoffs aligned to revenue and customer outcomes.",
+    "Established metrics review rituals that improved stakeholder visibility and reduced variance in sprint outcomes by 12%.",
+    "Aligned platform investments to customer and revenue signals using data-backed prioritization and stakeholder reviews.",
+]
+
+
 def _enforce_min_experience_bullets(data: Dict, *, min_bullets: int = 6) -> Dict:
     """
     Deterministic safety net:
     ensure the most recent experience includes at least `min_bullets` bullets.
-    This prevents 'only 3-4 bullets' outputs from reaching resume generation.
+    Deduplicates first, then pads only with *distinct* template bullets (never clones the last line).
     """
     if not isinstance(data, dict):
         return data
+    data = _dedupe_all_experience_bullets(data)
     exp = data.get("experience")
     if not isinstance(exp, list) or not exp:
         return data
@@ -147,19 +195,28 @@ def _enforce_min_experience_bullets(data: Dict, *, min_bullets: int = 6) -> Dict
     if not isinstance(bullets, list):
         return data
 
-    clean = [str(b).strip() for b in bullets if str(b).strip()]
+    clean = _dedupe_bullet_list([str(b) for b in bullets])
     if not clean:
         return data
 
-    while len(clean) < min_bullets:
-        # Duplicate last bullet text as a last resort.
-        # The earlier pipeline already enforces numeric tokens + ATS keywords.
-        clean.append(clean[-1])
-
+    existing_keys = {_normalize_bullet_key(b) for b in clean}
+    pad_i = 0
+    max_pad_attempts = len(_BULLET_PAD_STOCK) * 3
+    attempts = 0
+    while len(clean) < min_bullets and attempts < max_pad_attempts:
+        attempts += 1
+        cand = _BULLET_PAD_STOCK[pad_i % len(_BULLET_PAD_STOCK)]
+        pad_i += 1
+        ck = _normalize_bullet_key(cand)
+        if ck in existing_keys:
+            continue
+        clean.append(cand)
+        existing_keys.add(ck)
+    # If still short, prefer fewer bullets over duplicating content
     first["bullets"] = clean
     exp[0] = first
     data["experience"] = exp
-    return data
+    return _dedupe_all_experience_bullets(data)
 
 # Detect provider from key: Gemini keys start with "AIza", Anthropic with "sk-ant-"
 def _is_gemini_key(key: Optional[str]) -> bool:
@@ -414,6 +471,7 @@ STRICT RULES:
 3. BULLETS:
    - The MOST RECENT / CURRENT experience MUST have 6 to 8 bullets. This is the candidate's main selling point — show depth.
    - All OTHER experience entries MUST have 3 to 5 bullets each.
+   - NEVER repeat the same bullet text twice (each line must be unique wording).
    - Every bullet = Strong Action Verb + What You Did + Measurable Result
    - Each bullet MUST contain at least ONE numeric token from METRICS_FROM_RESUME.
    BAD: "Responsible for managing a team of 5"
@@ -773,12 +831,12 @@ def tailor_resume(
                 raw = _tailor_with_gemini(
                     resume_text, job_description, job_title, company, gemini_key
                 )
-                return _parse_tailor_response(raw)
+                return _enforce_min_experience_bullets(_parse_tailor_response(raw), min_bullets=6)
             except Exception as e:
                 logger.warning("Gemini tailoring failed; falling back to Ollama. Error: %s", str(e)[:220])
         try:
             raw = _tailor_with_ollama(resume_text, job_description, job_title, company)
-            return _parse_tailor_response(raw)
+            return _enforce_min_experience_bullets(_parse_tailor_response(raw), min_bullets=6)
         except Exception as e:
             raise ValueError(f"All providers failed. Last error: {str(e)[:200]}") from e
 
@@ -787,14 +845,14 @@ def tailor_resume(
         if not gemini_key or not _is_gemini_key(gemini_key):
             raise ValueError("No valid Gemini API key. Set GEMINI_API_KEY in .env or Settings.")
         raw = _tailor_with_gemini(resume_text, job_description, job_title, company, gemini_key)
-        return _parse_tailor_response(raw)
+        return _enforce_min_experience_bullets(_parse_tailor_response(raw), min_bullets=6)
 
     if provider == "claude":
         claude_key = (api_key or "").strip() or ANTHROPIC_API_KEY
         if not claude_key or _is_gemini_key(claude_key) or _is_openai_key(claude_key):
             raise ValueError("No valid Claude API key. Set ANTHROPIC_API_KEY in .env or Settings (sk-ant-...).")
         raw = _tailor_with_claude(resume_text, job_description, job_title, company, claude_key)
-        return _parse_tailor_response(raw)
+        return _enforce_min_experience_bullets(_parse_tailor_response(raw), min_bullets=6)
 
     raise ValueError(f"Unsupported AI_PROVIDER '{provider}'. Use openai, ollama, auto, gemini, or claude.")
 

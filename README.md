@@ -19,3 +19,4 @@ See `jobcraft/.gitignore` for paths excluded from version control (data, `.env`,
 
 - **Frontend:** deploy `jobcraft/frontend` to [Vercel](https://vercel.com); set `VITE_API_BASE_URL` to your hosted API (e.g. `https://your-api.example.com/api`).  
 - **Backend:** host FastAPI separately (Railway, Render, Fly, VPS)—see **[DEPLOY.md](./DEPLOY.md)** for steps and CORS.
+- **No-login demo:** production builds use `VITE_PUBLIC_DEMO_MODE=true` (see `jobcraft/frontend/.env.production`). The API must set **`PUBLIC_DEMO_MODE=true`** for unauthenticated access; **never** use that on a server with private data.

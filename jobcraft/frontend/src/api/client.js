@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { isPublicDemo } from '../config';
 
 // Production: set VITE_API_BASE_URL in Vercel (e.g. https://your-api.railway.app/api)
 // Dev: leave unset to use Vite proxy (/api -> localhost:8080)
@@ -22,7 +23,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    if (err.response?.status === 401 && !isPublicDemo) {
       localStorage.removeItem('jobcraft_token');
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';

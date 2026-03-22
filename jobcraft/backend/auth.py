@@ -15,9 +15,16 @@ from pydantic import BaseModel
 
 from database import get_db
 from models import User
-from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_HOURS
+from config import (
+    SECRET_KEY,
+    ALGORITHM,
+    ACCESS_TOKEN_EXPIRE_HOURS,
+    PUBLIC_DEMO_MODE,
+    DEFAULT_USERNAME,
+)
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+# auto_error=False allows missing Authorization header; get_current_user enforces JWT unless PUBLIC_DEMO_MODE.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 
 # --- Pydantic request/response schemas ---
@@ -52,7 +59,7 @@ def create_access_token(data: dict) -> str:
 # --- Get current user from token (FastAPI dependency) ---
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
     credentials_exception = HTTPException(
@@ -60,6 +67,18 @@ def get_current_user(
         detail="Invalid or expired token",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    if PUBLIC_DEMO_MODE:
+        user = db.query(User).filter(User.username == DEFAULT_USERNAME).first()
+        if user is not None:
+            return user
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Demo mode: default user not initialized yet",
+        )
+
+    if not token:
+        raise credentials_exception
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: Optional[str] = payload.get("sub")

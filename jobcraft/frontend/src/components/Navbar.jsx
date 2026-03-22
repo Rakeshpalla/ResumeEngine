@@ -1,11 +1,16 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { isPublicDemo } from '../config';
 
 export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleLogout = () => {
+    if (isPublicDemo) {
+      navigate('/upload');
+      return;
+    }
     localStorage.removeItem('jobcraft_token');
     navigate('/login');
   };
@@ -55,10 +60,11 @@ export default function Navbar() {
         </div>
 
         <button
+          type="button"
           onClick={handleLogout}
           className="rounded-lg border border-border px-3.5 py-1.5 text-sm text-text-secondary transition-colors hover:border-danger hover:text-danger"
         >
-          Sign Out
+          {isPublicDemo ? 'Home' : 'Sign Out'}
         </button>
       </div>
     </nav>

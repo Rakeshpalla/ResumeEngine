@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import JobDetail from './pages/JobDetail';
 import Settings from './pages/Settings';
 import SelectJobs from './pages/SelectJobs';
+import { isPublicDemo } from './config';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,24 +16,31 @@ const queryClient = new QueryClient({
 });
 
 function ProtectedRoute({ children }) {
+  if (isPublicDemo) return children;
   const token = localStorage.getItem('jobcraft_token');
   if (!token) return <Navigate to="/login" replace />;
   return children;
 }
 
 export default function App() {
+  const defaultPath = isPublicDemo ? '/upload' : '/login';
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<Login />} />
+          <Route
+            path="/login"
+            element={isPublicDemo ? <Navigate to="/upload" replace /> : <Login />}
+          />
           <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
           <Route path="/loading" element={<ProtectedRoute><Loading /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/jobs/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
           <Route path="/select-jobs" element={<ProtectedRoute><SelectJobs /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="/" element={<Navigate to={defaultPath} replace />} />
+          <Route path="*" element={<Navigate to={defaultPath} replace />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

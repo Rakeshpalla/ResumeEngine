@@ -364,6 +364,88 @@ def assign_grade(composite: float) -> str:
     return "D"
 
 
+def _ollama_dual_fit_hook_scores(
+    resume_text: str,
+    job_description: str,
+    summary: str,
+    job_title: str,
+) -> tuple[Dict, Dict]:
+    """
+    One Ollama generation for both subjective scores (replaces two sequential LLM calls).
+    Cuts typical scoring time roughly in half vs separate fit + hook calls.
+    """
+    import requests
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutTimeout
+
+    resume_t = (resume_text or "")[:1200]
+    jd_t = (job_description or "")[:1200]
+    summary_t = (summary or "")[:900]
+    jt = (job_title or "")[:120]
+
+    system = (
+        "You are an expert recruiter. Return ONLY valid JSON (no markdown, no commentary) with this exact shape:\n"
+        '{"experience_fit":{"score":<number 0-100>,"reasoning":"<string>"},'
+        '"recruiter_hook":{"score":<number 0-100>,"reasoning":"<string>"}}\n\n'
+        "experience_fit: how well the RESUME matches the JOB DESCRIPTION (0-100).\n"
+        f"recruiter_hook: how well the SUMMARY hooks a recruiter in 6 seconds for role '{jt}' (0-100).\n"
+    )
+    user = f"RESUME:\n{resume_t}\n\nJOB DESCRIPTION:\n{jd_t}\n\nSUMMARY:\n{summary_t}"
+    full_prompt = f"{system}\n{user}"
+
+    url = f"{OLLAMA_BASE_URL}/api/generate"
+
+    def _do():
+        r = requests.post(
+            url,
+            json={
+                "model": OLLAMA_MODEL,
+                "prompt": full_prompt,
+                "stream": False,
+                "options": {"temperature": 0.2, "num_predict": 420},
+            },
+            timeout=90,
+        )
+        r.raise_for_status()
+        return r.json()
+
+    t0 = time.perf_counter()
+    logger.info("Ollama dual-score start: model=%s job_title=%s", OLLAMA_MODEL, jt)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        fut = pool.submit(_do)
+        try:
+            data = fut.result(timeout=95)
+        except FutTimeout:
+            raise TimeoutError("Ollama dual-score hard timeout after 95s") from None
+
+    raw = (data.get("response") or "").strip()
+    if raw.startswith("```"):
+        lines = raw.split("\n")
+        lines = [ln for ln in lines if not ln.strip().startswith("```")]
+        raw = "\n".join(lines)
+    try:
+        out = json.loads(raw)
+        ef = out.get("experience_fit") or {}
+        rh = out.get("recruiter_hook") or {}
+        fit_result = {
+            "score": float(ef.get("score", 50)),
+            "reasoning": str(ef.get("reasoning", ""))[:500],
+        }
+        hook_result = {
+            "score": float(rh.get("score", 50)),
+            "reasoning": str(rh.get("reasoning", ""))[:500],
+        }
+        logger.info(
+            "Ollama dual-score success: elapsed=%.2fs fit=%s hook=%s",
+            time.perf_counter() - t0,
+            fit_result["score"],
+            hook_result["score"],
+        )
+        return fit_result, hook_result
+    except Exception as e:
+        logger.warning("Ollama dual-score JSON parse failed: %s raw=%s", str(e)[:120], raw[:200])
+        raise
+
+
 def score_job(
     resume_text: str,
     job_description: str,
@@ -381,10 +463,28 @@ def score_job(
     ats = compute_ats_score(tailored_flat, job_description)
     keyword = compute_keyword_match(tailored_resume, job_description)
 
-    fit_result = compute_experience_fit(resume_text, job_description, api_key)
-    hook_result = compute_recruiter_hook(
-        tailored_resume.get("summary", ""), job_title, api_key
-    )
+    provider = (AI_PROVIDER or "auto").strip().lower()
+    summary = tailored_resume.get("summary", "") or ""
+
+    # Ollama: one combined call beats two slow sequential generations.
+    if provider == "ollama":
+        try:
+            fit_result, hook_result = _ollama_dual_fit_hook_scores(
+                resume_text, job_description, summary, job_title
+            )
+        except Exception as e:
+            logger.warning("Ollama dual-score failed; falling back to 2 calls. %s", str(e)[:200])
+            fit_result = compute_experience_fit(resume_text, job_description, api_key)
+            hook_result = compute_recruiter_hook(summary, job_title, api_key)
+    else:
+        # Cloud APIs: run fit + hook in parallel (was fully sequential before).
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            fut_fit = pool.submit(compute_experience_fit, resume_text, job_description, api_key)
+            fut_hook = pool.submit(compute_recruiter_hook, summary, job_title, api_key)
+            fit_result = fut_fit.result()
+            hook_result = fut_hook.result()
 
     composite = compute_composite_score(
         ats, keyword, fit_result["score"], hook_result["score"]
