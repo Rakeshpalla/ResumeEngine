@@ -6,14 +6,32 @@ The **React app** fits [Vercel](https://vercel.com) well. The **Python API** (Fa
 
 1. Push this repo to GitHub (already done for [ResumeEngine](https://github.com/Rakeshpalla/ResumeEngine)).
 2. In Vercel: **Add New Project** → import **ResumeEngine**.
-3. **Root Directory:** `jobcraft/frontend`
-4. **Framework Preset:** Vite (auto-detected).
-5. **Environment Variables** (Production + Preview):
-   - `VITE_API_BASE_URL` = your public API base, **must include `/api`**  
-     Example: `https://your-backend.example.com/api`
-6. Deploy.
 
-`jobcraft/frontend/vercel.json` adds SPA rewrites so React Router works on refresh.
+**Choose one layout (wrong choice → build uploads nothing → `404 NOT_FOUND`):**
+
+### A) Repository root (recommended; works with root `vercel.json`)
+
+1. **Settings → General → Root Directory:** leave **empty** (repo root).
+2. The repo includes **`vercel.json`** at the root with `installCommand` / `buildCommand` / `outputDirectory` pointing at `jobcraft/frontend`.
+3. **Framework Preset:** Vite is optional; the root config drives the build.
+
+### B) App folder only
+
+1. **Root Directory:** `jobcraft/frontend`
+2. **Framework Preset:** Vite, **Output:** `dist` (default).
+3. Do **not** rely on the **root** `vercel.json` for build paths (that file is for layout A). `jobcraft/frontend/vercel.json` still supplies SPA rewrites.
+
+**Environment Variables** (Production + Preview):
+
+- `VITE_API_BASE_URL` = your public API base, **must include `/api`**  
+  Example: `https://your-backend.example.com/api`
+
+Then **Deploy** (or **Redeploy** after changing settings).
+
+### If you see `404: NOT_FOUND` on `*.vercel.app`
+
+- Open **Deployments** → latest deployment → **Building** / **Logs**. Confirm **Build Successful** and that files exist under `jobcraft/frontend/dist` (layout A) or `dist` (layout B).
+- Most often: Vercel built the **repo root** with no `package.json`, so nothing was published. Fix with **layout A or B** above, then redeploy.
 
 ## 2. Deploy the backend (choose one)
 

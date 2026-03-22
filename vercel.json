@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd jobcraft/frontend && npm install",
+  "buildCommand": "cd jobcraft/frontend && npm run build",
+  "outputDirectory": "jobcraft/frontend/dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
