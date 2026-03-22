@@ -25,8 +25,8 @@ The **React app** fits [Vercel](https://vercel.com) well. The **Python API** (Fa
 
 - `VITE_API_BASE_URL` = your public API base, **must include `/api`**  
   Example: `https://your-backend.example.com/api`
-- **Public demo (no login screen):** set `VITE_PUBLIC_DEMO_MODE` = `true` and redeploy.  
-  Your **backend** must also set `PUBLIC_DEMO_MODE=true` (and `CORS_ORIGINS` including this Vercel URL), or API calls will return **401**.
+- **Login:** production builds **skip the login screen by default**. To require login again, set `VITE_PUBLIC_DEMO_MODE` = `false` on Vercel and redeploy.  
+  Your **backend** must set `PUBLIC_DEMO_MODE=true` for API calls without JWT (and `CORS_ORIGINS` including this Vercel URL), or you’ll get **401**s.
 
 Then **Deploy** (or **Redeploy** after changing settings).
 
